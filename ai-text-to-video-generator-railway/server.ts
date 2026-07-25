@@ -429,6 +429,44 @@ app.post("/api/veo-generate-video", async (req, res) => {
   }
 });
 
+// 4b. AI Presenter (lip-synced talking avatar) generation
+// Builds a Veo prompt describing a presenter speaking the scene's script on
+// camera, so Veo's native dialogue/lip-sync generation produces a talking
+// avatar clip instead of a silent B-roll clip.
+app.post("/api/generate-presenter-scene", async (req, res) => {
+  try {
+    const { scriptText, presenterDescription, aspectRatio, resolution } = req.body;
+    if (!scriptText) {
+      return res.status(400).json({ error: "scriptText is required for presenter generation" });
+    }
+
+    const appearance =
+      presenterDescription?.trim() ||
+      "A professional, friendly on-camera presenter, business casual attire, well-lit indoor studio background";
+
+    // Veo's dialogue prompting convention: describe the speaker, the setting,
+    // and quote the exact line they should say so audio + lip movement stay
+    // in sync with the narration script used elsewhere in the project.
+    const prompt = `${appearance}. The presenter speaks directly and warmly to the camera, with natural lip-synced dialogue, clear articulation, and subtle hand gestures. Medium shot, steady camera, professional lighting. The presenter says: "${scriptText.replace(/"/g, "'")}"`;
+
+    const ai = getGenAI();
+    const operation = await ai.models.generateVideos({
+      model: "veo-3.1-lite-generate-preview",
+      prompt,
+      config: {
+        numberOfVideos: 1,
+        resolution: (resolution as "720p" | "1080p") || "720p",
+        aspectRatio: (aspectRatio as "16:9" | "9:16") || "16:9",
+      },
+    });
+
+    res.json({ operationName: operation.name });
+  } catch (error: any) {
+    console.error("Error starting AI presenter video generation:", error);
+    res.status(500).json({ error: error.message || "Failed to start presenter video generation" });
+  }
+});
+
 app.post("/api/veo-status", async (req, res) => {
   try {
     const { operationName } = req.body;
