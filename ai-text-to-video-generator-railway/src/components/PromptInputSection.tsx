@@ -9,6 +9,7 @@ import {
   Sparkles,
   Layers,
   Settings2,
+  UserRound,
 } from 'lucide-react';
 import {
   AspectRatio,
@@ -40,6 +41,10 @@ interface PromptInputSectionProps {
   setMusicGenre: (val: MusicGenre) => void;
   subtitleEnabled: boolean;
   setSubtitleEnabled: (val: boolean) => void;
+  presenterEnabled: boolean;
+  setPresenterEnabled: (val: boolean) => void;
+  presenterDescription: string;
+  setPresenterDescription: (val: string) => void;
   customImages: string[];
   setCustomImages: React.Dispatch<React.SetStateAction<string[]>>;
   onEnhance: () => void;
@@ -68,6 +73,10 @@ export const PromptInputSection: React.FC<PromptInputSectionProps> = ({
   setMusicGenre,
   subtitleEnabled,
   setSubtitleEnabled,
+  presenterEnabled,
+  setPresenterEnabled,
+  presenterDescription,
+  setPresenterDescription,
   customImages,
   setCustomImages,
   onEnhance,
@@ -314,6 +323,39 @@ export const PromptInputSection: React.FC<PromptInputSectionProps> = ({
           customImages={customImages}
           setCustomImages={setCustomImages}
         />
+
+        {/* AI Presenter (Lip-Synced Avatar) Section */}
+        <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-800">
+          <label className="flex items-center space-x-2 cursor-pointer mb-3">
+            <input
+              type="checkbox"
+              checked={presenterEnabled}
+              onChange={(e) => setPresenterEnabled(e.target.checked)}
+              className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+            />
+            <UserRound className="w-4 h-4 text-indigo-500" />
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Add AI Presenter (lip-synced talking avatar)
+            </span>
+          </label>
+          {presenterEnabled && (
+            <div className="pl-6">
+              <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                Presenter appearance (kept consistent across scenes)
+              </label>
+              <textarea
+                value={presenterDescription}
+                onChange={(e) => setPresenterDescription(e.target.value)}
+                placeholder="e.g. A friendly woman in her 30s, business casual navy blazer, warm studio lighting, speaking directly to camera"
+                rows={2}
+                className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                The presenter will speak the scene's script on camera with AI-generated lip-synced dialogue (uses Veo video generation, which is slower than static AI images).
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Subtitles Toggle & Main Generate Trigger */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-5 mt-5 border-t border-slate-100 dark:border-slate-800">
