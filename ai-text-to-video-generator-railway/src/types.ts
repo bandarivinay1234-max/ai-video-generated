@@ -30,6 +30,9 @@ export interface Scene {
   audioUrl?: string;         // Generated TTS speech audio data URL
   customAudioUrl?: string;   // Custom user-recorded or uploaded audio voiceover
   subtitles: SubtitleItem[];
+  isPresenterScene?: boolean;      // True if this scene uses the AI presenter (lip-synced avatar)
+  presenterOperationName?: string; // Veo operation name while the presenter clip is generating
+  presenterStatus?: 'idle' | 'generating' | 'completed' | 'failed';
 }
 
 export interface VideoProject {
@@ -53,6 +56,8 @@ export interface VideoProject {
   progress: number;
   errorMessage?: string;
   createdAt: string;
+  presenterEnabled?: boolean;      // Toggle: use an AI talking presenter/avatar
+  presenterDescription?: string;   // Appearance description kept consistent across presenter scenes
 }
 
 export interface User {
