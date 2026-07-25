@@ -1,0 +1,6 @@
+{
+  "name": "AI Text-to-Video Generator",
+  "description": "Full-stack AI-powered text-to-video generator with prompt enhancement, voice narration, background music, subtitles, and history.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
