@@ -22,6 +22,63 @@ import {
 } from './types';
 import { Sparkles, Film, Play, Layers } from 'lucide-react';
 
+// Kicks off Veo lip-synced presenter video generation, polls until the
+// operation completes, then downloads the finished clip as a blob object URL
+// the <video> element / canvas renderer can play directly.
+async function generatePresenterClip(
+  scriptText: string,
+  presenterDescription: string,
+  aspectRatio: AspectRatio,
+  onProgress?: (msg: string) => void
+): Promise<string | null> {
+  const startRes = await fetch('/api/generate-presenter-scene', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      scriptText,
+      presenterDescription,
+      aspectRatio: aspectRatio === '9:16' ? '9:16' : '16:9',
+      resolution: '720p',
+    }),
+  });
+  const startData = await startRes.json();
+  if (!startData.operationName) {
+    throw new Error(startData.error || 'Failed to start presenter video generation');
+  }
+
+  onProgress?.('Rendering talking avatar clip (this can take a minute or two)...');
+
+  // Poll for completion. Veo generation typically takes 30s-3min.
+  const maxAttempts = 40;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await new Promise((r) => setTimeout(r, 5000));
+    const statusRes = await fetch('/api/veo-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ operationName: startData.operationName }),
+    });
+    const statusData = await statusRes.json();
+    if (statusData.error) {
+      throw new Error(statusData.error);
+    }
+    if (statusData.done) {
+      onProgress?.('Downloading generated presenter clip...');
+      const downloadRes = await fetch('/api/veo-download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operationName: startData.operationName }),
+      });
+      if (!downloadRes.ok) {
+        throw new Error('Failed to download generated presenter clip');
+      }
+      const blob = await downloadRes.blob();
+      return URL.createObjectURL(blob);
+    }
+  }
+
+  throw new Error('Presenter video generation timed out');
+}
+
 export default function App() {
   // Theme state
   const [darkMode, setDarkMode] = useState<boolean>(true);
@@ -47,6 +104,8 @@ export default function App() {
   const [musicGenre, setMusicGenre] = useState<MusicGenre>('epic');
   const [subtitleEnabled, setSubtitleEnabled] = useState<boolean>(true);
   const [customImages, setCustomImages] = useState<string[]>([]);
+  const [presenterEnabled, setPresenterEnabled] = useState<boolean>(false);
+  const [presenterDescription, setPresenterDescription] = useState<string>('');
 
   // Storyboard / Generation State
   const [currentProject, setCurrentProject] = useState<VideoProject | null>(null);
@@ -212,7 +271,31 @@ export default function App() {
         setProgressPercentage(p);
         setStatusText(`Step 2/5: Generating AI visual frame for Scene ${i + 1}/${scenes.length}...`);
 
-        if (!scenes[i].imageUrl) {
+        // AI Presenter: the opening scene becomes a lip-synced talking avatar
+        // clip generated via Veo instead of a static AI image.
+        if (presenterEnabled && i === 0) {
+          scenes[i].isPresenterScene = true;
+          scenes[i].presenterStatus = 'generating';
+          try {
+            const clipUrl = await generatePresenterClip(
+              scenes[i].scriptText,
+              presenterDescription,
+              aspectRatio,
+              (msg) => setStatusText(`Step 2/5: AI Presenter - ${msg}`)
+            );
+            if (clipUrl) {
+              scenes[i].videoClipUrl = clipUrl;
+              scenes[i].presenterStatus = 'completed';
+            } else {
+              scenes[i].presenterStatus = 'failed';
+            }
+          } catch (e) {
+            console.warn('AI Presenter clip generation failed, falling back to static image:', e);
+            scenes[i].presenterStatus = 'failed';
+          }
+        }
+
+        if (!scenes[i].imageUrl && !scenes[i].videoClipUrl) {
           try {
             const res = await fetch('/api/generate-scene-visual', {
               method: 'POST',
@@ -234,11 +317,17 @@ export default function App() {
       }
 
       // Step 3: Synthesize Speech Voiceover (TTS) for each scene
+      // (Presenter scenes already have narration baked into the Veo clip's
+      // own generated audio, so TTS is skipped for those.)
       setCurrentStepIndex(2);
       for (let i = 0; i < scenes.length; i++) {
         const p = 45 + Math.floor((i / scenes.length) * 20);
         setProgressPercentage(p);
         setStatusText(`Step 3/5: Synthesizing voiceover narration for Scene ${i + 1}/${scenes.length}...`);
+
+        if (scenes[i].isPresenterScene) {
+          continue;
+        }
 
         if (!scenes[i].audioUrl && scenes[i].scriptText) {
           try {
@@ -443,6 +532,10 @@ export default function App() {
           setMusicGenre={setMusicGenre}
           subtitleEnabled={subtitleEnabled}
           setSubtitleEnabled={setSubtitleEnabled}
+          presenterEnabled={presenterEnabled}
+          setPresenterEnabled={setPresenterEnabled}
+          presenterDescription={presenterDescription}
+          setPresenterDescription={setPresenterDescription}
           customImages={customImages}
           setCustomImages={setCustomImages}
           onEnhance={handleEnhancePrompt}
