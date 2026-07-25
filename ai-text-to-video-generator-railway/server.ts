@@ -320,6 +320,36 @@ app.post("/api/generate-scene-visual", async (req, res) => {
   res.json({ imageUrl: fallbackUrl, provider: "placeholder" });
 });
 
+// Wraps raw headerless PCM audio bytes in a standard WAV (RIFF) header so
+// that browsers (AudioContext.decodeAudioData) and audio players can read it.
+function pcmToWav(
+  pcmData: Buffer,
+  sampleRate: number,
+  numChannels: number,
+  bitsPerSample: number
+): Buffer {
+  const blockAlign = (numChannels * bitsPerSample) / 8;
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = pcmData.length;
+  const header = Buffer.alloc(44);
+
+  header.write("RIFF", 0, "ascii");
+  header.writeUInt32LE(36 + dataSize, 4);
+  header.write("WAVE", 8, "ascii");
+  header.write("fmt ", 12, "ascii");
+  header.writeUInt32LE(16, 16); // fmt chunk size (PCM)
+  header.writeUInt16LE(1, 20); // audio format = 1 (PCM)
+  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write("data", 36, "ascii");
+  header.writeUInt32LE(dataSize, 40);
+
+  return Buffer.concat([header, pcmData]);
+}
+
 // 3. Text-to-Speech (TTS) Narration API
 app.post("/api/generate-tts", async (req, res) => {
   const { text, voice } = req.body;
@@ -348,10 +378,17 @@ app.post("/api/generate-tts", async (req, res) => {
 
       const part = response.candidates?.[0]?.content?.parts?.[0];
       const base64Audio = part?.inlineData?.data;
-      const mimeType = part?.inlineData?.mimeType || "audio/mp3";
+      const mimeType = part?.inlineData?.mimeType || "audio/L16;rate=24000";
 
       if (base64Audio) {
-        const audioUrl = `data:${mimeType};base64,${base64Audio}`;
+        // Gemini TTS returns raw headerless PCM (e.g. audio/L16;rate=24000).
+        // Browsers' decodeAudioData() cannot decode raw PCM without a WAV
+        // header, so we wrap it into a proper WAV file here.
+        const pcmBuffer = Buffer.from(base64Audio, "base64");
+        const rateMatch = /rate=(\d+)/.exec(mimeType);
+        const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+        const wavBuffer = pcmToWav(pcmBuffer, sampleRate, 1, 16);
+        const audioUrl = `data:audio/wav;base64,${wavBuffer.toString("base64")}`;
         return res.json({ audioUrl });
       }
     } catch (error: any) {
