@@ -289,9 +289,10 @@ export default function App() {
             } else {
               scenes[i].presenterStatus = 'failed';
             }
-          } catch (e) {
+          } catch (e: any) {
             console.warn('AI Presenter clip generation failed, falling back to static image:', e);
             scenes[i].presenterStatus = 'failed';
+            scenes[i].presenterError = e?.message || 'Unknown error generating presenter clip';
           }
         }
 
