@@ -258,36 +258,39 @@ app.post("/api/generate-scene-visual", async (req, res) => {
   const promptText = `High quality, ultra detailed ${style || "cinematic"} style visuals: ${visualPrompt}. Masterpiece composition, vibrant colors, 8k render, professional lighting.`;
 
   // 1. First attempt: GenAI image model
-  try {
-    const ai = getGenAI();
-    const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-lite-image",
-      contents: {
-        parts: [{ text: promptText }],
-      },
-      config: {
-        imageConfig: {
-          aspectRatio: aspectRatio || "16:9",
+  const imageModelsToTry = ["gemini-3.1-flash-image", "gemini-2.5-flash-image"];
+  for (const imageModel of imageModelsToTry) {
+    try {
+      const ai = getGenAI();
+      const response = await ai.models.generateContent({
+        model: imageModel,
+        contents: {
+          parts: [{ text: promptText }],
         },
-      },
-    });
+        config: {
+          imageConfig: {
+            aspectRatio: aspectRatio || "16:9",
+          },
+        },
+      });
 
-    let imageUrl = "";
-    if (response.candidates?.[0]?.content?.parts) {
-      for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData) {
-          const mimeType = part.inlineData.mimeType || "image/png";
-          imageUrl = `data:${mimeType};base64,${part.inlineData.data}`;
-          break;
+      let imageUrl = "";
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            const mimeType = part.inlineData.mimeType || "image/png";
+            imageUrl = `data:${mimeType};base64,${part.inlineData.data}`;
+            break;
+          }
         }
       }
-    }
 
-    if (imageUrl) {
-      return res.json({ imageUrl, provider: "gemini" });
+      if (imageUrl) {
+        return res.json({ imageUrl, provider: "gemini" });
+      }
+    } catch (error: any) {
+      console.warn(`Gemini image model ${imageModel} hit quota or error, trying next option:`, error.message || error);
     }
-  } catch (error: any) {
-    console.warn("Gemini image model hit quota or error, falling back to AI image synthesis:", error.message || error);
   }
 
   // 2. Fallback: Pollinations AI Image Synthesis (Flux / SDXL high quality text-to-image)
@@ -298,7 +301,7 @@ app.post("/api/generate-scene-visual", async (req, res) => {
     const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=${width}&height=${height}&seed=${seed}&nologo=true&enhance=true`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     const imgRes = await fetch(pollinationsUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
     if (imgRes.ok) {
