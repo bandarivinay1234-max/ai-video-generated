@@ -33,6 +33,7 @@ export interface Scene {
   isPresenterScene?: boolean;      // True if this scene uses the AI presenter (lip-synced avatar)
   presenterOperationName?: string; // Veo operation name while the presenter clip is generating
   presenterStatus?: 'idle' | 'generating' | 'completed' | 'failed';
+  presenterError?: string;         // Human-readable reason the presenter clip failed, if it did
 }
 
 export interface VideoProject {
