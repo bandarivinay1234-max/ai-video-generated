@@ -263,8 +263,11 @@ export const SceneBreakdownEditor: React.FC<SceneBreakdownEditorProps> = ({
                   </span>
                 ) : null}
                 {scene.isPresenterScene ? (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30">
-                    AI Presenter {scene.presenterStatus === 'generating' ? '(generating...)' : scene.presenterStatus === 'failed' ? '(failed)' : ''}
+                  <span
+                    title={scene.presenterError || undefined}
+                    className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 cursor-help"
+                  >
+                    AI Presenter {scene.presenterStatus === 'generating' ? '(generating...)' : scene.presenterStatus === 'failed' ? '(failed - hover for reason)' : ''}
                   </span>
                 ) : null}
               </div>
