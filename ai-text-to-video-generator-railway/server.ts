@@ -463,7 +463,18 @@ app.post("/api/generate-presenter-scene", async (req, res) => {
     res.json({ operationName: operation.name });
   } catch (error: any) {
     console.error("Error starting AI presenter video generation:", error);
-    res.status(500).json({ error: error.message || "Failed to start presenter video generation" });
+    const rawMessage: string = error?.message || String(error);
+    let friendlyMessage = rawMessage;
+    if (/billing|quota|429|permission|403/i.test(rawMessage)) {
+      friendlyMessage =
+        "Veo video generation requires a Google Cloud project with billing enabled (it has no free tier). " +
+        "Enable billing for your project and confirm Veo access, then try again. Raw error: " +
+        rawMessage;
+    } else if (/404|not found|not supported/i.test(rawMessage)) {
+      friendlyMessage =
+        "The Veo model used for the AI Presenter isn't available for this API key/region. Raw error: " + rawMessage;
+    }
+    res.status(500).json({ error: friendlyMessage });
   }
 });
 
